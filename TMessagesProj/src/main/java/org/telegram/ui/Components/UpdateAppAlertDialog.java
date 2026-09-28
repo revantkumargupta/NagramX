@@ -34,7 +34,6 @@ import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SvgHelper;
 import org.telegram.messenger.Utilities;
-import org.telegram.messenger.browser.Browser;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
@@ -340,11 +339,10 @@ public class UpdateAppAlertDialog extends BottomSheet {
         Context context = getContext();
         Activity activity = AndroidUtilities.getActivity(context);
         if (activity == null) {
-            Browser.openUrl(context, appUpdate.url);
-            dismiss();
+            Toast.makeText(context, LocaleController.getString(R.string.ErrorOccurred), Toast.LENGTH_LONG).show();
             return;
         }
-        File cacheDir = new File(context.getCacheDir(), "updates");
+        File cacheDir = new File(activity.getCacheDir(), "updates");
         urlUpdateDownloading = true;
         button.setEnabled(false);
         button.setText(LocaleController.formatString(R.string.AppUpdateDownloading, 0), false);
@@ -364,8 +362,6 @@ public class UpdateAppAlertDialog extends BottomSheet {
                     button.setEnabled(true);
                     button.setText(LocaleController.formatString("AppUpdateDownloadNow", R.string.AppUpdateDownloadNow), false);
                     Toast.makeText(context, LocaleController.getString(R.string.ErrorOccurred), Toast.LENGTH_LONG).show();
-                    Browser.openUrl(context, appUpdate.url);
-                    dismiss();
                 });
                 return;
             }
