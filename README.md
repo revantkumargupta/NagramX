@@ -1,46 +1,61 @@
 # Nagram X
 
-> [!IMPORTANT]
-> This project is archived and no longer maintained. No further updates, bug fixes, or support will be provided. The source code and existing releases remain available for reference and for anyone who wishes to continue development in a fork.
+Nagram X is a maintained fork of Nagram based on Telegram Android. Current maintained source and releases are published from `revantkumargupta/NagramX`.
 
-## Archived Downloads
+## Downloads
 
-Previously published versions remain available through:
+- [GitHub Releases](https://github.com/revantkumargupta/NagramX/releases)
+- [Telegram Channel](https://t.me/NagramX)
 
-* [Telegram Channel](https://t.me/NagramX)
-* [GitHub Releases](https://github.com/risin42/NagramX/releases)
+The first maintained release is [`v12.10.5-1262`](https://github.com/revantkumargupta/NagramX/releases/tag/v12.10.5-1262), based on Telegram Android `12.10.5 (7105)`.
 
 ## Verify APK
 
-Official APKs use the following Android signing certificate:
+Current maintained APKs use this Android signing certificate:
 
-* Package name: `nu.gpu.nagram` / `nu.gpu.nagramx` (base version)
-* SHA-256: `0D:51:91:56:E8:0C:91:8C:28:C4:80:BF:D1:3F:31:6A:3B:3B:F7:22:DB:53:2F:AB:74:66:0E:C8:E5:C5:06:A1`
+- Package name: `nu.gpu.nagram`
+- Version name: `12.10.5`
+- APK version code: `1262`
+- SHA-256: `00:11:40:4B:3D:F9:D1:A0:87:68:CD:FD:42:AE:76:73:5F:30:B2:6F:E3:2C:37:05:67:56:8C:76:BD:A7:36:87`
+
+Older archived APKs from the previous maintainer used a different signing certificate. Android will not install an update across different certificates, so users moving from an older/debug/test build may need to uninstall once before installing the current maintained release.
+
+## Updates
+
+The in-app updater checks GitHub Releases at `https://api.github.com/repos/revantkumargupta/NagramX/releases` and opens the matching APK download URL. Android still requires the user to confirm APK installation; silent OTA updates are not possible for sideloaded builds.
+
+For future releases:
+
+- Sign every APK with the same maintained release key.
+- Increment the APK `versionCode` in `TMessagesProj/build.gradle` (`verCode`).
+- Keep `APP_VERSION_NAME` and `APP_VERSION_CODE` in `gradle.properties` aligned with the upstream Telegram version.
+- Create a GitHub Release with APK assets containing ABI names such as `arm64-v8a`, `x86_64`, or `universal`.
+- Include a parseable APK version code in the release title or body, for example `NagramX v12.10.6 (1263)` or `Version code: 1263`.
 
 ## Compilation Guide
 
 1. Clone the repository with its submodules:
 
-    ```bash
-    git clone --recursive --shallow-submodules https://github.com/risin42/NagramX.git NagramX
-    ```
+   ```bash
+   git clone --recursive --shallow-submodules https://github.com/revantkumargupta/NagramX.git NagramX
+   ```
 
-    You will require Android Studio 2025.1.4, Android NDK 27.2.12479018 and Android SDK 36.
+   You will need Android Studio, Android NDK `27.2.12479018`, Android SDK platform `37`, and JDK `21`.
 
-    If you already cloned the repository without submodules, run:
+2. If you already cloned the repository without submodules, run:
 
-    ```bash
-    git submodule update --init --recursive --depth=1
-    ```
+   ```bash
+   git submodule update --init --recursive --depth=1
+   ```
 
-2. Obtain API credentials (`TELEGRAM_APP_ID` and `TELEGRAM_APP_HASH`) from [Telegram Developer Portal](https://my.telegram.org/auth). Create `local.properties` in the project root with:
+3. Obtain API credentials (`TELEGRAM_APP_ID` and `TELEGRAM_APP_HASH`) from the [Telegram Developer Portal](https://my.telegram.org/auth). Create `local.properties` in the project root with:
 
    ```properties
    TELEGRAM_APP_ID=<your_telegram_app_id>
    TELEGRAM_APP_HASH=<your_telegram_app_hash>
    ```
 
-3. For APK signing: Replace `release.keystore` with your keystore and add signing configuration to `local.properties`:
+4. For signed APKs, place your release keystore at `TMessagesProj/release.keystore` and add signing configuration to `local.properties`:
 
    ```properties
    KEYSTORE_PASS=<your_keystore_password>
@@ -48,40 +63,31 @@ Official APKs use the following Android signing certificate:
    ALIAS_PASS=<your_alias_password>
    ```
 
-4. For FCM support: Replace `TMessagesProj/google-services.json` with your own configuration file.
+5. For FCM support, replace `TMessagesProj/google-services.json` with your own configuration file.
 
-5. Replace project-specific metadata:
+6. Replace project-specific metadata if you fork this project:
 
-    - Set your Google Maps API key in the `com.google.android.maps.v2.API_KEY` meta-data entry in `TMessagesProj/src/main/AndroidManifest.xml`.
-    - Set `BaseRemoteHelper.CHANNEL_METADATA_ID` in `TMessagesProj/src/main/java/tw/nekomimi/nekogram/helpers/remote/BaseRemoteHelper.java` to your metadata channel's numeric ID, without the `-100` prefix.
+   - Set your Google Maps API key in the `com.google.android.maps.v2.API_KEY` meta-data entry in `TMessagesProj/src/main/AndroidManifest.xml`.
+   - Set `BaseRemoteHelper.CHANNEL_METADATA_ID` in `TMessagesProj/src/main/java/tw/nekomimi/nekogram/helpers/remote/BaseRemoteHelper.java` to your metadata channel's numeric ID, without the `-100` prefix.
+   - Update `GITHUB_RELEASES_API` in `TMessagesProj/src/main/java/tw/nekomimi/nekogram/helpers/remote/UpdateHelper.java` to your release repository.
 
-6. Open the project in Android Studio to start building.
+7. Build locally:
+
+   ```bash
+   ./gradlew :TMessagesProj:assembleRelease
+   ```
 
 ## GitHub Actions Build
 
-The workflow can be used from a fork of this repository.
+The workflows can build from this repository or a fork. For official signed builds, configure these GitHub Actions secrets:
 
-1. Replace `TMessagesProj/release.keystore` with your keystore file.
+- `LOCAL_PROPERTIES`: Base64-encoded `local.properties` containing `KEYSTORE_PASS`, `ALIAS_NAME`, `ALIAS_PASS`, `TELEGRAM_APP_ID`, and `TELEGRAM_APP_HASH`.
+- `RELEASE_KEYSTORE_BASE64`: Base64-encoded release keystore file.
+- `HELPER_BOT_TOKEN`: Telegram bot token from [@Botfather](https://t.me/BotFather).
+- `HELPER_BOT_TARGET`: Primary Telegram chat ID.
+- `HELPER_BOT_CANARY_TARGET`: Chat ID for test builds and metadata.
 
-2. Configure `local.properties` with the following:
-
-   ```properties
-   KEYSTORE_PASS=<your_keystore_password>
-   ALIAS_NAME=<your_alias_name>
-   ALIAS_PASS=<your_alias_password>
-   TELEGRAM_APP_ID=<your_telegram_app_id>
-   TELEGRAM_APP_HASH=<your_telegram_app_hash>
-   ```
-
-   Base64 encode the contents of this file.
-
-3. Configure GitHub Action secrets:
-   - `LOCAL_PROPERTIES`: Base64-encoded content from step 2
-   - `HELPER_BOT_TOKEN`: Telegram bot token from [@Botfather](https://t.me/Botfather) (e.g., `1111:abcd`)
-   - `HELPER_BOT_TARGET`: Primary Telegram chat ID (e.g., `777000`)
-   - `HELPER_BOT_CANARY_TARGET`: Chat ID for test builds and metadata (can match `HELPER_BOT_TARGET`)
-
-4. Trigger the Release Build workflow.
+The maintained release key must never be committed to the repository.
 
 ## Acknowledgments
 

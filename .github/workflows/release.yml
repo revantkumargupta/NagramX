@@ -2,12 +2,8 @@ name: Release Build
 
 on:
   push:
-    branches:
-      - main
-    paths-ignore:
-      - '**.md'
-      - '.github/**'
-      - '!.github/workflows/release.yml'
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       upload:
@@ -46,6 +42,13 @@ jobs:
       - name: Configure Android SDK Path
         run: |
           echo "sdk.dir=${ANDROID_HOME}" >> local.properties
+      - name: Configure Release Keystore
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "${RELEASE_KEYSTORE_BASE64}" ]; then
+            printf '%s' "${RELEASE_KEYSTORE_BASE64}" | base64 --decode > TMessagesProj/release.keystore
+          fi
       - name: Modify Gradle JVM Args
         run: |
           MEMORY_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
