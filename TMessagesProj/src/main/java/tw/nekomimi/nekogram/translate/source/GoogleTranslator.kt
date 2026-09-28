@@ -6,14 +6,12 @@ import okhttp3.HttpUrl
 import okhttp3.Request
 import org.json.JSONException
 import org.json.JSONObject
-import org.telegram.messenger.FileLog
 import org.telegram.messenger.LocaleController.getString
 import org.telegram.messenger.R
 import org.telegram.tgnet.TLRPC
 import org.telegram.ui.Components.TranslateAlert2
 import tw.nekomimi.nekogram.translate.HTMLKeeper
 import tw.nekomimi.nekogram.translate.Translator
-import tw.nekomimi.nekogram.translate.source.fallback.GoogleTranslatorNeko
 import tw.nekomimi.nekogram.utils.HttpClient
 import java.io.IOException
 
@@ -42,12 +40,7 @@ object GoogleTranslator : Translator {
         val translated = try {
             translate(textToTranslate, from, to)
         } catch (e: RuntimeException) {
-            try {
-                FileLog.e("Cloud Translation API request failed, trying to use Nekogram's translation API...", e)
-                GoogleTranslatorNeko.translate(textToTranslate, from, to)
-            } catch (e: Exception) {
-                error("Cloud Translation API request failed: ${e.message}")
-            }
+            error("Cloud Translation API request failed: ${e.message}")
         }
 
         val finalText: TLRPC.TL_textWithEntities

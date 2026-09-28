@@ -51,7 +51,12 @@ import java.util.zip.GZIPOutputStream;
 import tw.nekomimi.nekogram.utils.GsonUtil;
 
 public class CloudSettingsHelper {
-    public static final SharedPreferences.OnSharedPreferenceChangeListener listener = (preferences, key) -> CloudSettingsHelper.getInstance().doAutoSync();
+    private static final boolean CLOUD_SETTINGS_SYNC_ENABLED = false;
+    public static final SharedPreferences.OnSharedPreferenceChangeListener listener = (preferences, key) -> {
+        if (CLOUD_SETTINGS_SYNC_ENABLED) {
+            CloudSettingsHelper.getInstance().doAutoSync();
+        }
+    };
     private static final SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekocloud", Context.MODE_PRIVATE);
     private final SparseArray<Long> cloudSyncedDate = new SparseArray<>();
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -110,6 +115,23 @@ public class CloudSettingsHelper {
 
         AlertDialog.Builder builder = new AlertDialog.Builder(context, resourcesProvider);
         builder.setTitle(getString(R.string.CloudConfig));
+
+        if (!CLOUD_SETTINGS_SYNC_ENABLED) {
+            builder.setMessage(getString(R.string.CloudConfigDisabledDesc));
+            builder.setPositiveButton(getString(R.string.DeleteCloudBackup), (dialog, which) -> deleteCloudBackup((success, error) -> {
+                if (success) {
+                    BulletinFactory.of(Bulletin.BulletinWindow.make(context), resourcesProvider).createSimpleBulletin(R.raw.done, getString(R.string.DeleteCloudBackupSuccess)).show();
+                } else if (error == null) {
+                    BulletinFactory.of(Bulletin.BulletinWindow.make(context), resourcesProvider).createSimpleBulletin(R.raw.info, getString(R.string.CloudConfigNoBackupToDelete)).show();
+                } else {
+                    BulletinFactory.of(Bulletin.BulletinWindow.make(context), resourcesProvider).createSimpleBulletin(R.raw.error, getString(R.string.DeleteCloudBackupFailed), error).show();
+                }
+            }));
+            builder.setNegativeButton(getString(R.string.Cancel), null);
+            parentFragment.showDialog(builder.create());
+            return;
+        }
+
         builder.setMessage(AndroidUtilities.replaceTags(getString(R.string.CloudConfigDesc)));
         builder.setTopImage(R.drawable.cloud, Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider));
 
@@ -227,6 +249,13 @@ public class CloudSettingsHelper {
     }
 
     public void doAutoSync() {
+        if (!CLOUD_SETTINGS_SYNC_ENABLED) {
+            if (autoSync) {
+                autoSync = false;
+                preferences.edit().putBoolean("auto_sync", false).apply();
+            }
+            return;
+        }
         if (!autoSync) {
             return;
         }
@@ -235,8 +264,12 @@ public class CloudSettingsHelper {
     }
 
     private void syncToCloud(Utilities.Callback2<Boolean, String> callback) {
+        if (!CLOUD_SETTINGS_SYNC_ENABLED) {
+            callback.run(false, getString(R.string.CloudConfigDisabledDesc));
+            return;
+        }
         try {
-            String settingsJson = SettingsBackupHelper.backupSettingsJson(true, 0);
+            String settingsJson = SettingsBackupHelper.backupSettingsJson(true, 0, false);
             String payload = gzipBase64Encode(settingsJson);
             int numChunks = (int) Math.ceil((double) payload.length() / MAX_CHUNK_CHARS);
             syncChunk(payload, 0, numChunks, MAX_CHUNK_CHARS, callback);
@@ -277,6 +310,10 @@ public class CloudSettingsHelper {
     }
 
     private void restoreFromCloud(Utilities.Callback2<Boolean, String> callback) {
+        if (!CLOUD_SETTINGS_SYNC_ENABLED) {
+            callback.run(false, getString(R.string.CloudConfigDisabledDesc));
+            return;
+        }
         getCloudStorageHelper().getItems(new String[]{SETTINGS_CHUNKS_COUNT_KEY, SETTINGS_ENCODING_KEY}, (meta, metaError) -> {
             if (metaError != null || meta == null) {
                 callback.run(false, metaError);

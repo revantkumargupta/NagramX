@@ -328,7 +328,7 @@ interface Translator {
                 providerYandex -> YandexTranslator
                 providerLingo -> LingoTranslator
                 providerMicrosoft -> MicrosoftTranslator
-                providerRealMicrosoft -> RealMicrosoftTranslator
+                providerRealMicrosoft -> MicrosoftTranslator
                 providerDeepL -> DeepLTranslator
                 providerTelegram -> TelegramAPITranslator
                 providerTranSmart -> TranSmartTranslator
@@ -352,7 +352,6 @@ interface Translator {
                     ProviderInfo(providerYandex, R.string.ProviderYandexTranslate),
                     ProviderInfo(providerLingo, R.string.ProviderLingocloud),
                     ProviderInfo(providerMicrosoft, R.string.ProviderMicrosoftTranslator),
-                    ProviderInfo(providerRealMicrosoft, R.string.ProviderRealMicrosoftTranslator),
                     ProviderInfo(providerDeepL, R.string.ProviderDeepLTranslate),
                     ProviderInfo(providerTelegram, R.string.ProviderTelegramAPI),
                     ProviderInfo(providerTranSmart, R.string.ProviderTranSmartTranslate),

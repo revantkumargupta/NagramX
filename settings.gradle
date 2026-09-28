@@ -16,7 +16,7 @@ plugins {
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
         google()
         mavenCentral()
@@ -25,3 +25,36 @@ dependencyResolutionManagement {
 
 rootProject.name = "NagramX"
 include ':TMessagesProj'
+include ':jlatexmath'
+project(':jlatexmath').projectDir = file('TMessagesProj/lib/jlatexmath/jlatexmath')
+
+gradle.ext.androidxMediaModulePrefix = 'TMessagesProj_Modules:media3:media-'
+include ':TMessagesProj_Modules'
+project(':TMessagesProj_Modules').projectDir = file('TMessagesProj_Modules')
+include ':TMessagesProj_Modules:media3'
+project(':TMessagesProj_Modules:media3').projectDir = file('TMessagesProj_Modules/media')
+gradle.ext.androidxMediaSettingsDir = file('TMessagesProj_Modules/media').canonicalPath
+
+def includeMedia3 = { name, dir ->
+    def projectPath = ":${gradle.ext.androidxMediaModulePrefix}${name}"
+    include projectPath
+    project(projectPath).projectDir = file("TMessagesProj_Modules/media/libraries/${dir}")
+}
+
+includeMedia3('lib-common', 'common')
+includeMedia3('lib-container', 'container')
+includeMedia3('lib-database', 'database')
+includeMedia3('lib-datasource', 'datasource')
+includeMedia3('lib-decoder', 'decoder')
+includeMedia3('lib-decoder-ffmpeg', 'decoder_ffmpeg')
+includeMedia3('lib-effect', 'effect')
+includeMedia3('lib-extractor', 'extractor')
+includeMedia3('lib-exoplayer', 'exoplayer')
+includeMedia3('lib-exoplayer-dash', 'exoplayer_dash')
+includeMedia3('lib-exoplayer-hls', 'exoplayer_hls')
+includeMedia3('lib-muxer', 'muxer')
+includeMedia3('lib-session', 'session')
+includeMedia3('lib-transformer', 'transformer')
+includeMedia3('test-data', 'test_data')
+includeMedia3('test-utils', 'test_utils')
+includeMedia3('test-utils-robolectric', 'test_utils_robolectric')

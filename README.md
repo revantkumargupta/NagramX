@@ -25,6 +25,8 @@ Official APKs use the following Android signing certificate:
     git clone --recursive --shallow-submodules https://github.com/risin42/NagramX.git NagramX
     ```
 
+    You will require Android Studio 2025.1.4, Android NDK 27.2.12479018 and Android SDK 36.
+
     If you already cloned the repository without submodules, run:
 
     ```bash

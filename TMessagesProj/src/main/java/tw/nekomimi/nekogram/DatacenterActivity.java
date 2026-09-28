@@ -31,6 +31,7 @@ import org.telegram.ui.Components.BackupImageView;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.LinkSpanDrawable;
 import org.telegram.ui.Components.RecyclerListView;
+import org.telegram.utils.proxy.ProxySettings;
 
 import java.util.Locale;
 
@@ -120,7 +121,11 @@ public class DatacenterActivity extends BaseNekoSettingsActivity implements Noti
         if (force) {
             listAdapter.notifyItemChanged(position);
         }
-        datacenterInfo.pingId = ConnectionsManager.getInstance(currentAccount).checkProxy("ping.neko", datacenterInfo.id, null, null, null, time -> AndroidUtilities.runOnUIThread(() -> {
+        ProxySettings settings = ProxySettings.builder()
+                .setAddress("ping.neko")
+                .setPort(datacenterInfo.id)
+                .build();
+        datacenterInfo.pingId = ConnectionsManager.getInstance(currentAccount).checkProxy(settings, time -> AndroidUtilities.runOnUIThread(() -> {
             datacenterInfo.availableCheckTime = SystemClock.elapsedRealtime();
             datacenterInfo.checking = false;
             if (time == -1) {

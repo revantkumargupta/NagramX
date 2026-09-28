@@ -60,11 +60,12 @@ public final class SettingsBackupHelper {
 
         ArrayList<String> userconfig = new ArrayList<>();
         userconfig.add("saveIncomingPhotos");
-        userconfig.add("passcodeHash");
-        userconfig.add("passcodeType");
-        userconfig.add("passcodeHash");
-        userconfig.add("autoLockIn");
-        userconfig.add("useFingerprint");
+        if (!isCloud) {
+            userconfig.add("passcodeHash");
+            userconfig.add("passcodeType");
+            userconfig.add("autoLockIn");
+            userconfig.add("useFingerprint");
+        }
         spToJSON("userconfing", configJson, userconfig::contains, isCloud);
 
         ArrayList<String> mainconfig = new ArrayList<>();
@@ -301,7 +302,7 @@ public final class SettingsBackupHelper {
         checkBoxCell.setBackground(Theme.getSelectorDrawable(false));
         checkBoxCell.setText(getString(R.string.ExportSettingsIncludeApiKeys), "", true, false);
         checkBoxCell.setPadding(LocaleController.isRTL ? dp(16) : dp(8), 0, LocaleController.isRTL ? dp(8) : dp(16), 0);
-        checkBoxCell.setChecked(true, false);
+        checkBoxCell.setChecked(false, false);
         checkBoxCell.setOnClickListener(v -> {
             CheckBoxCell cell = (CheckBoxCell) v;
             cell.setChecked(!cell.isChecked(), true);

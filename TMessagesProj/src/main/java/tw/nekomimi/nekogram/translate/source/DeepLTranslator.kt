@@ -10,7 +10,6 @@ import org.telegram.tgnet.TLRPC
 import org.telegram.ui.Components.TranslateAlert2
 import tw.nekomimi.nekogram.translate.HTMLKeeper
 import tw.nekomimi.nekogram.translate.Translator
-import tw.nekomimi.nekogram.translate.source.fallback.DeepLTranslatorNeko
 import tw.nekomimi.nekogram.utils.HttpClient
 import xyz.nextalone.nagram.NaConfig
 import java.io.IOException
@@ -38,19 +37,7 @@ object DeepLTranslator : Translator {
 
         val apiKey = NaConfig.deepLTranslateKey.String().trim()
         val translatedText = if (apiKey.isEmpty()) {
-            try {
-                DeepLTranslatorNeko.translate(
-                    textToTranslate,
-                    from,
-                    when (to.lowercase(Locale.ROOT)) {
-                        "zh", "zh-cn", "zh-hans" -> "zh-CN"
-                        "zh-tw", "zh-hk", "zh-hant" -> "zh-TW"
-                        else -> to
-                    }
-                )
-            } catch (e: Exception) {
-                error("DeepL API request failed: ${e.message}")
-            }
+            error("DeepL API key is required")
         } else {
             translateWithApiKey(apiKey, textToTranslate, from, to, entities.isNotEmpty())
         }

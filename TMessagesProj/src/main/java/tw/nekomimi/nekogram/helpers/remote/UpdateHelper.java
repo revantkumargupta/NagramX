@@ -2,10 +2,12 @@ package tw.nekomimi.nekogram.helpers.remote;
 
 import android.os.Build;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.telegram.messenger.BuildConfig;
 import org.telegram.messenger.FileLoader;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
@@ -13,11 +15,18 @@ import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import xyz.nextalone.nagram.NaConfig;
 
@@ -26,6 +35,9 @@ public class UpdateHelper extends BaseRemoteHelper {
     public static final int UPDATE_OFF = 0;
     public static final int UPDATE_CHANNEL_RELEASE = 1;
     public static final int UPDATE_CHANNEL_BETA = 2;
+    private static final String GITHUB_RELEASES_API = "https://api.github.com/repos/revantkumargupta/NagramX/releases";
+    private static final Pattern VERSION_CODE_IN_PARENTHESES = Pattern.compile("\\((\\d+)\\)");
+    private static final Pattern VERSION_CODE_FIELD = Pattern.compile("(?i)version[_ -]?code\\s*[:=]\\s*(\\d+)");
     private boolean updateAlways = false;
 
     public static UpdateHelper getInstance() {
@@ -202,7 +214,160 @@ public class UpdateHelper extends BaseRemoteHelper {
 
     public void checkNewVersionAvailable(Delegate delegate, boolean updateAlways) {
         this.updateAlways = updateAlways;
-        load(delegate);
+        loadGitHubRelease(delegate);
+    }
+
+    private void loadGitHubRelease(Delegate delegate) {
+        if (NaConfig.INSTANCE.getAutoUpdateChannel().Int() == UPDATE_OFF && !updateAlways) {
+            delegate.onTLResponse(null, null);
+            return;
+        }
+        Utilities.globalQueue.postRunnable(() -> {
+            try {
+                JSONObject release = fetchGitHubRelease();
+                TLRPC.TL_help_appUpdate update = buildGitHubUpdate(release);
+                delegate.onTLResponse(update, null);
+            } catch (Exception e) {
+                FileLog.e(e);
+                delegate.onTLResponse(null, e.getMessage());
+            } finally {
+                updateAlways = false;
+            }
+        });
+    }
+
+    private JSONObject fetchGitHubRelease() throws Exception {
+        String endpoint = NaConfig.INSTANCE.getAutoUpdateChannel().Int() == UPDATE_CHANNEL_BETA
+                ? GITHUB_RELEASES_API + "?per_page=10"
+                : GITHUB_RELEASES_API + "/latest";
+        String json = httpGet(endpoint);
+        if (NaConfig.INSTANCE.getAutoUpdateChannel().Int() == UPDATE_CHANNEL_BETA) {
+            JSONArray releases = new JSONArray(json);
+            for (int i = 0; i < releases.length(); i++) {
+                JSONObject release = releases.getJSONObject(i);
+                if (chooseGitHubApkAsset(release.optJSONArray("assets")) != null) {
+                    return release;
+                }
+            }
+            throw new JSONException("No GitHub release APK assets found");
+        }
+        return new JSONObject(json);
+    }
+
+    private String httpGet(String endpoint) throws Exception {
+        HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
+        connection.setConnectTimeout(15000);
+        connection.setReadTimeout(15000);
+        connection.setRequestProperty("Accept", "application/vnd.github+json");
+        connection.setRequestProperty("User-Agent", "NagramX/" + BuildConfig.VERSION_NAME);
+        int code = connection.getResponseCode();
+        try (InputStream stream = code >= 200 && code < 300 ? connection.getInputStream() : connection.getErrorStream()) {
+            if (stream == null) {
+                throw new IllegalStateException("GitHub update check failed: HTTP " + code);
+            }
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = stream.read(buffer)) != -1) {
+                output.write(buffer, 0, read);
+            }
+            byte[] bytes = output.toByteArray();
+            String body = new String(bytes, StandardCharsets.UTF_8);
+            if (code < 200 || code >= 300) {
+                throw new IllegalStateException("GitHub update check failed: HTTP " + code + " " + body);
+            }
+            return body;
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private TLRPC.TL_help_appUpdate buildGitHubUpdate(JSONObject release) throws Exception {
+        JSONObject asset = chooseGitHubApkAsset(release.optJSONArray("assets"));
+        if (asset == null) {
+            throw new JSONException("No compatible GitHub release APK asset found");
+        }
+        int remoteVersion = parseVersionCode(release, asset);
+        if (remoteVersion <= 0) {
+            throw new JSONException("GitHub release is missing a parseable version code");
+        }
+        if (!updateAlways && remoteVersion <= BuildConfig.VERSION_CODE) {
+            return null;
+        }
+
+        String name = release.optString("name", release.optString("tag_name", asset.optString("name", "")));
+        String body = release.optString("body", "").trim();
+        TLRPC.TL_help_appUpdate update = new TLRPC.TL_help_appUpdate();
+        update.version = name.isEmpty() ? BuildConfig.VERSION_NAME : name;
+        update.can_not_skip = false;
+        update.text = body.isEmpty() ? "Download the latest NagramX release from GitHub." : body;
+        update.entities = new ArrayList<>();
+        update.url = asset.getString("browser_download_url");
+        update.flags |= 4;
+        return update;
+    }
+
+    private JSONObject chooseGitHubApkAsset(JSONArray assets) {
+        if (assets == null) {
+            return null;
+        }
+        JSONObject firstApk = null;
+        JSONObject universalApk = null;
+        try {
+            for (int i = 0; i < assets.length(); i++) {
+                JSONObject asset = assets.getJSONObject(i);
+                String name = asset.optString("name", "").toLowerCase();
+                if (!name.endsWith(".apk")) {
+                    continue;
+                }
+                if (firstApk == null) {
+                    firstApk = asset;
+                }
+                if (name.contains("universal")) {
+                    universalApk = asset;
+                }
+                for (String abi : Build.SUPPORTED_ABIS) {
+                    if (name.contains(abi.toLowerCase())) {
+                        return asset;
+                    }
+                }
+            }
+        } catch (JSONException e) {
+            FileLog.e(e);
+        }
+        return universalApk != null ? universalApk : firstApk;
+    }
+
+    private int parseVersionCode(JSONObject release, JSONObject asset) {
+        String[] candidates = new String[]{
+                asset.optString("name", ""),
+                release.optString("name", ""),
+                release.optString("tag_name", ""),
+                release.optString("body", "")
+        };
+        for (String candidate : candidates) {
+            int version = parseVersionCode(candidate);
+            if (version > 0) {
+                return version;
+            }
+        }
+        return 0;
+    }
+
+    private int parseVersionCode(String value) {
+        if (value == null) {
+            return 0;
+        }
+        Matcher fieldMatcher = VERSION_CODE_FIELD.matcher(value);
+        if (fieldMatcher.find()) {
+            return Utilities.parseInt(fieldMatcher.group(1));
+        }
+        Matcher parenthesesMatcher = VERSION_CODE_IN_PARENTHESES.matcher(value);
+        int parsed = 0;
+        while (parenthesesMatcher.find()) {
+            parsed = Utilities.parseInt(parenthesesMatcher.group(1));
+        }
+        return parsed;
     }
 
     private static final class InstanceHolder {

@@ -42,6 +42,16 @@
 
 # https://developers.google.com/ml-kit/known-issues#android_issues
 -keep class com.google.mlkit.nl.languageid.internal.ThickLanguageIdentifier { *; }
+-keep class com.google.mlkit.nl.languageid.internal.LanguageIdentificationJni { *; }
+
+# Huawei Services
+-keep class com.huawei.hianalytics.**{ *; }
+-keep class com.huawei.updatesdk.**{ *; }
+-keep class com.huawei.hms.**{ *; }
+
+# Don't warn about checkerframework and Kotlin annotations
+-dontwarn org.checkerframework.**
+-dontwarn javax.annotation.**
 
 # Constant folding for resource integers may mean that a resource passed to this method appears to be unused. Keep the method to prevent this from happening.
 -keep class com.google.android.exoplayer2.upstream.RawResourceDataSource {
@@ -106,6 +116,8 @@
 }
 
 -keep class io.nano.tex.** {*;}
+
+-keep class org.telegram.tgnet.** { *; }
 
 # JLatexMath: macro/atom classes are loaded reflectively by Class.forName
 -keep class org.scilab.forge.jlatexmath.** { *; }
@@ -249,3 +261,9 @@
 -keepattributes *Annotation*
 -dontoptimize
 -dontobfuscate
+
+# Use -keep to explicitly keep any other classes shrinking would remove
+#-dontoptimize
+#-dontobfuscate
+
+-keep class org.telegram.tgnet.** { *; }
