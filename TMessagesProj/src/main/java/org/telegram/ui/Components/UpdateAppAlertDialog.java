@@ -4,6 +4,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
+import android.app.Activity;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.PorterDuff;
@@ -18,21 +19,32 @@ import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.core.widget.NestedScrollView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.BuildConfig;
 import org.telegram.messenger.DocumentObject;
 import org.telegram.messenger.FileLoader;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SvgHelper;
+import org.telegram.messenger.Utilities;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.Locale;
 
 import tw.nekomimi.nekogram.TextViewEffects;
 
@@ -62,6 +74,7 @@ public class UpdateAppAlertDialog extends BottomSheet {
     private int[] location = new int[2];
 
     private boolean animationInProgress;
+    private boolean urlUpdateDownloading;
 
     public class BottomSheetCell extends FrameLayout {
 
@@ -303,7 +316,8 @@ public class UpdateAppAlertDialog extends BottomSheet {
             if (appUpdate.document != null) {
                 FileLoader.getInstance(accountNum).loadFile(appUpdate.document, "update", FileLoader.PRIORITY_NORMAL, 1);
             } else if (appUpdate.url != null) {
-                Browser.openUrl(getContext(), appUpdate.url);
+                downloadUrlUpdate(doneButton);
+                return;
             }
             dismiss();
         });
@@ -311,8 +325,135 @@ public class UpdateAppAlertDialog extends BottomSheet {
 
         BottomSheetCell scheduleButton = new BottomSheetCell(context, true);
         scheduleButton.setText(LocaleController.getString(R.string.AppUpdateRemindMeLater), false);
-        scheduleButton.background.setOnClickListener(v -> dismiss());
+        scheduleButton.background.setOnClickListener(v -> {
+            if (!urlUpdateDownloading) {
+                dismiss();
+            }
+        });
         container.addView(scheduleButton, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 50, Gravity.LEFT | Gravity.BOTTOM, 0, 0, 0, 0));
+    }
+
+    private void downloadUrlUpdate(BottomSheetCell button) {
+        if (urlUpdateDownloading) {
+            return;
+        }
+        Context context = getContext();
+        if (!(context instanceof Activity)) {
+            Browser.openUrl(context, appUpdate.url);
+            dismiss();
+            return;
+        }
+        Activity activity = (Activity) context;
+        File cacheDir = new File(context.getCacheDir(), "updates");
+        urlUpdateDownloading = true;
+        button.setEnabled(false);
+        button.setText(LocaleController.formatString(R.string.AppUpdateDownloading, 0), false);
+
+        Utilities.globalQueue.postRunnable(() -> {
+            File apkFile;
+            try {
+                apkFile = downloadApk(appUpdate.url, cacheDir, progress -> AndroidUtilities.runOnUIThread(() -> {
+                    if (urlUpdateDownloading) {
+                        button.setText(LocaleController.formatString(R.string.AppUpdateDownloading, progress), false);
+                    }
+                }));
+            } catch (Exception e) {
+                FileLog.e(e);
+                AndroidUtilities.runOnUIThread(() -> {
+                    urlUpdateDownloading = false;
+                    button.setEnabled(true);
+                    button.setText(LocaleController.formatString("AppUpdateDownloadNow", R.string.AppUpdateDownloadNow), false);
+                    Toast.makeText(context, LocaleController.getString(R.string.ErrorOccurred), Toast.LENGTH_LONG).show();
+                    Browser.openUrl(context, appUpdate.url);
+                    dismiss();
+                });
+                return;
+            }
+
+            AndroidUtilities.runOnUIThread(() -> {
+                urlUpdateDownloading = false;
+                button.setEnabled(true);
+                dismiss();
+                AndroidUtilities.openForView(apkFile, apkFile.getName(), "application/vnd.android.package-archive", activity, null, false);
+            });
+        });
+    }
+
+    private File downloadApk(String url, File cacheDir, Utilities.Callback<Integer> progressCallback) throws Exception {
+        if (!cacheDir.exists() && !cacheDir.mkdirs()) {
+            throw new IllegalStateException("Unable to create update cache directory");
+        }
+        File[] oldFiles = cacheDir.listFiles();
+        if (oldFiles != null) {
+            for (File file : oldFiles) {
+                String name = file.getName().toLowerCase(Locale.US);
+                if (file.isFile() && (name.endsWith(".apk") || name.endsWith(".tmp"))) {
+                    //noinspection ResultOfMethodCallIgnored
+                    file.delete();
+                }
+            }
+        }
+
+        String fileName = getUpdateApkFileName(url);
+        File outputFile = new File(cacheDir, fileName);
+        File tempFile = new File(cacheDir, fileName + ".tmp");
+
+        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+        connection.setConnectTimeout(15000);
+        connection.setReadTimeout(60000);
+        connection.setRequestProperty("Accept", "application/octet-stream");
+        connection.setRequestProperty("User-Agent", "NagramX/" + BuildConfig.VERSION_NAME);
+        int code = connection.getResponseCode();
+        if (code < 200 || code >= 300) {
+            connection.disconnect();
+            throw new IllegalStateException("Update download failed: HTTP " + code);
+        }
+
+        int total = connection.getContentLength();
+        int lastProgress = -1;
+        try (InputStream input = connection.getInputStream(); FileOutputStream output = new FileOutputStream(tempFile)) {
+            byte[] buffer = new byte[64 * 1024];
+            int read;
+            long downloaded = 0;
+            while ((read = input.read(buffer)) != -1) {
+                output.write(buffer, 0, read);
+                downloaded += read;
+                if (total > 0) {
+                    int progress = Math.min(100, (int) (downloaded * 100 / total));
+                    if (progress != lastProgress) {
+                        lastProgress = progress;
+                        progressCallback.run(progress);
+                    }
+                }
+            }
+        } finally {
+            connection.disconnect();
+        }
+
+        //noinspection ResultOfMethodCallIgnored
+        outputFile.delete();
+        if (!tempFile.renameTo(outputFile)) {
+            throw new IllegalStateException("Unable to save update APK");
+        }
+        progressCallback.run(100);
+        return outputFile;
+    }
+
+    private String getUpdateApkFileName(String url) {
+        String fileName = "NagramX-update.apk";
+        try {
+            String path = new URL(url).getPath();
+            int slash = path.lastIndexOf('/');
+            if (slash >= 0 && slash < path.length() - 1) {
+                fileName = path.substring(slash + 1);
+            }
+        } catch (Exception ignored) {
+        }
+        fileName = fileName.replaceAll("[^A-Za-z0-9._-]", "_");
+        if (!fileName.toLowerCase(Locale.US).endsWith(".apk")) {
+            fileName += ".apk";
+        }
+        return fileName;
     }
 
     private void runShadowAnimation(final int num, final boolean show) {
