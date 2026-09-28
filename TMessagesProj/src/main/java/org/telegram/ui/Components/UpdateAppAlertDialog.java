@@ -343,7 +343,12 @@ public class UpdateAppAlertDialog extends BottomSheet {
             dismiss();
             return;
         }
-        Activity activity = (Activity) context;
+        Activity activity = AndroidUtilities.getActivity(context);
+        if (activity == null) {
+            Browser.openUrl(context, appUpdate.url);
+            dismiss();
+            return;
+        }
         File cacheDir = new File(context.getCacheDir(), "updates");
         urlUpdateDownloading = true;
         button.setEnabled(false);
