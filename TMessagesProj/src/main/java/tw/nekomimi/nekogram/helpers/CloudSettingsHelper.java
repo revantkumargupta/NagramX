@@ -53,9 +53,7 @@ import tw.nekomimi.nekogram.utils.GsonUtil;
 public class CloudSettingsHelper {
     private static final boolean CLOUD_SETTINGS_SYNC_ENABLED = false;
     public static final SharedPreferences.OnSharedPreferenceChangeListener listener = (preferences, key) -> {
-        if (CLOUD_SETTINGS_SYNC_ENABLED) {
-            CloudSettingsHelper.getInstance().doAutoSync();
-        }
+        CloudSettingsHelper.getInstance().doAutoSync();
     };
     private static final SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekocloud", Context.MODE_PRIVATE);
     private final SparseArray<Long> cloudSyncedDate = new SparseArray<>();
@@ -280,17 +278,28 @@ public class CloudSettingsHelper {
 
     private void syncChunk(String setting, int index, int numChunks, int chunkSize, Utilities.Callback2<Boolean, String> callback) {
         if (index >= numChunks) {
-            getCloudStorageHelper().setItem(SETTINGS_CHUNKS_COUNT_KEY, String.valueOf(numChunks), (res, error) -> {
-                if (error == null) {
-                    localSyncedDate = System.currentTimeMillis();
-                    cloudSyncedDate.put(UserConfig.selectedAccount, localSyncedDate);
-                    getCloudStorageHelper().setItem(SETTINGS_UPDATED_AT_KEY, String.valueOf(localSyncedDate), null);
-                    getCloudStorageHelper().setItem(SETTINGS_ENCODING_KEY, SETTINGS_ENCODING_GZIP_BASE64_V1, null);
-                    preferences.edit().putLong("updated_at", localSyncedDate).apply();
-                    callback.run(true, null);
-                } else {
+            long updatedAt = System.currentTimeMillis();
+            getCloudStorageHelper().setItem(SETTINGS_ENCODING_KEY, SETTINGS_ENCODING_GZIP_BASE64_V1, (res, error) -> {
+                if (error != null) {
                     callback.run(false, error);
+                    return;
                 }
+                getCloudStorageHelper().setItem(SETTINGS_UPDATED_AT_KEY, String.valueOf(updatedAt), (res2, error2) -> {
+                    if (error2 != null) {
+                        callback.run(false, error2);
+                        return;
+                    }
+                    getCloudStorageHelper().setItem(SETTINGS_CHUNKS_COUNT_KEY, String.valueOf(numChunks), (res3, error3) -> {
+                        if (error3 != null) {
+                            callback.run(false, error3);
+                            return;
+                        }
+                        localSyncedDate = updatedAt;
+                        cloudSyncedDate.put(UserConfig.selectedAccount, localSyncedDate);
+                        preferences.edit().putLong("updated_at", localSyncedDate).apply();
+                        callback.run(true, null);
+                    });
+                });
             });
             return;
         }

@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -38,7 +39,7 @@ public class UpdateHelper extends BaseRemoteHelper {
     private static final String GITHUB_RELEASES_API = "https://api.github.com/repos/revantkumargupta/NagramX/releases";
     private static final Pattern VERSION_CODE_IN_PARENTHESES = Pattern.compile("\\((\\d+)\\)");
     private static final Pattern VERSION_CODE_FIELD = Pattern.compile("(?i)version[_ -]?code\\s*[:=]\\s*(\\d+)");
-    private boolean updateAlways = false;
+    private static final Pattern VERSION_CODE_IN_RELEASE_NAME = Pattern.compile("(?i)(?:^|[^0-9])v?\\d+\\.\\d+\\.\\d+[-_.](\\d+)(?=$|[^0-9])");
 
     public static UpdateHelper getInstance() {
         return InstanceHolder.instance;
@@ -110,10 +111,7 @@ public class UpdateHelper extends BaseRemoteHelper {
                 } else if (remoteVersion == currentVersion && remoteBuildTimestamp > buildTimestamp) {
                     shouldUpdate = true;
                 }
-                if (shouldUpdate || updateAlways) {
-                    if (updateAlways) {
-                        updateAlways = false;
-                    }
+                if (shouldUpdate) {
                     ref = new Update(
                             string.getBoolean("can_not_skip"),
                             string.getString("version"),
@@ -213,45 +211,61 @@ public class UpdateHelper extends BaseRemoteHelper {
     }
 
     public void checkNewVersionAvailable(Delegate delegate, boolean updateAlways) {
-        this.updateAlways = updateAlways;
-        loadGitHubRelease(delegate);
+        checkNewVersionAvailable(delegate, false, updateAlways);
     }
 
-    private void loadGitHubRelease(Delegate delegate) {
-        if (NaConfig.INSTANCE.getAutoUpdateChannel().Int() == UPDATE_OFF && !updateAlways) {
+    public void checkNewVersionAvailable(Delegate delegate, boolean force, boolean updateAlways) {
+        loadGitHubRelease(delegate, force, updateAlways);
+    }
+
+    private void loadGitHubRelease(Delegate delegate, boolean force, boolean updateAlways) {
+        if (NaConfig.INSTANCE.getAutoUpdateChannel().Int() == UPDATE_OFF && !force && !updateAlways) {
             delegate.onTLResponse(null, null);
             return;
         }
         Utilities.globalQueue.postRunnable(() -> {
             try {
-                JSONObject release = fetchGitHubRelease();
-                TLRPC.TL_help_appUpdate update = buildGitHubUpdate(release);
+                JSONObject release = fetchGitHubRelease(updateAlways);
+                TLRPC.TL_help_appUpdate update = buildGitHubUpdate(release, updateAlways);
                 delegate.onTLResponse(update, null);
             } catch (Exception e) {
                 FileLog.e(e);
                 delegate.onTLResponse(null, e.getMessage());
-            } finally {
-                updateAlways = false;
             }
         });
     }
 
-    private JSONObject fetchGitHubRelease() throws Exception {
-        String endpoint = NaConfig.INSTANCE.getAutoUpdateChannel().Int() == UPDATE_CHANNEL_BETA
-                ? GITHUB_RELEASES_API + "?per_page=10"
-                : GITHUB_RELEASES_API + "/latest";
-        String json = httpGet(endpoint);
-        if (NaConfig.INSTANCE.getAutoUpdateChannel().Int() == UPDATE_CHANNEL_BETA) {
-            JSONArray releases = new JSONArray(json);
-            for (int i = 0; i < releases.length(); i++) {
-                JSONObject release = releases.getJSONObject(i);
-                if (chooseGitHubApkAsset(release.optJSONArray("assets")) != null) {
-                    return release;
-                }
+    private JSONObject fetchGitHubRelease(boolean updateAlways) throws Exception {
+        String json = httpGet(GITHUB_RELEASES_API + "?per_page=20");
+        JSONArray releases = new JSONArray(json);
+        JSONObject bestRelease = null;
+        int bestVersion = 0;
+        int channel = NaConfig.INSTANCE.getAutoUpdateChannel().Int();
+        for (int i = 0; i < releases.length(); i++) {
+            JSONObject release = releases.getJSONObject(i);
+            if (channel != UPDATE_CHANNEL_BETA && release.optBoolean("prerelease", false)) {
+                continue;
             }
-            throw new JSONException("No GitHub release APK assets found");
+            JSONObject asset = chooseGitHubApkAsset(release.optJSONArray("assets"));
+            if (asset == null) {
+                continue;
+            }
+            int remoteVersion = parseVersionCode(release, asset);
+            if (remoteVersion <= 0) {
+                continue;
+            }
+            if (!updateAlways && remoteVersion <= BuildConfig.VERSION_CODE) {
+                continue;
+            }
+            if (bestRelease == null || remoteVersion > bestVersion) {
+                bestRelease = release;
+                bestVersion = remoteVersion;
+            }
         }
-        return new JSONObject(json);
+        if (bestRelease == null) {
+            return null;
+        }
+        return bestRelease;
     }
 
     private String httpGet(String endpoint) throws Exception {
@@ -282,7 +296,10 @@ public class UpdateHelper extends BaseRemoteHelper {
         }
     }
 
-    private TLRPC.TL_help_appUpdate buildGitHubUpdate(JSONObject release) throws Exception {
+    private TLRPC.TL_help_appUpdate buildGitHubUpdate(JSONObject release, boolean updateAlways) throws Exception {
+        if (release == null) {
+            return null;
+        }
         JSONObject asset = chooseGitHubApkAsset(release.optJSONArray("assets"));
         if (asset == null) {
             throw new JSONException("No compatible GitHub release APK asset found");
@@ -311,23 +328,19 @@ public class UpdateHelper extends BaseRemoteHelper {
         if (assets == null) {
             return null;
         }
-        JSONObject firstApk = null;
         JSONObject universalApk = null;
         try {
             for (int i = 0; i < assets.length(); i++) {
                 JSONObject asset = assets.getJSONObject(i);
-                String name = asset.optString("name", "").toLowerCase();
+                String name = asset.optString("name", "").toLowerCase(Locale.US);
                 if (!name.endsWith(".apk")) {
                     continue;
-                }
-                if (firstApk == null) {
-                    firstApk = asset;
                 }
                 if (name.contains("universal")) {
                     universalApk = asset;
                 }
                 for (String abi : Build.SUPPORTED_ABIS) {
-                    if (name.contains(abi.toLowerCase())) {
+                    if (assetNameContainsAbi(name, abi.toLowerCase(Locale.US))) {
                         return asset;
                     }
                 }
@@ -335,18 +348,47 @@ public class UpdateHelper extends BaseRemoteHelper {
         } catch (JSONException e) {
             FileLog.e(e);
         }
-        return universalApk != null ? universalApk : firstApk;
+        return universalApk;
+    }
+
+    private boolean assetNameContainsAbi(String name, String abi) {
+        int index = name.indexOf(abi);
+        while (index >= 0) {
+            int end = index + abi.length();
+            boolean before = index == 0 || !isAbiNameChar(name.charAt(index - 1));
+            boolean after = end == name.length() || !isAbiNameChar(name.charAt(end));
+            if (before && after) {
+                return true;
+            }
+            index = name.indexOf(abi, index + 1);
+        }
+        return false;
+    }
+
+    private boolean isAbiNameChar(char c) {
+        return Character.isLetterOrDigit(c) || c == '_';
     }
 
     private int parseVersionCode(JSONObject release, JSONObject asset) {
-        String[] candidates = new String[]{
-                asset.optString("name", ""),
+        String[] explicitCandidates = new String[]{
+                release.optString("body", ""),
                 release.optString("name", ""),
                 release.optString("tag_name", ""),
-                release.optString("body", "")
+                asset.optString("name", "")
         };
-        for (String candidate : candidates) {
-            int version = parseVersionCode(candidate);
+        for (String candidate : explicitCandidates) {
+            int version = parseVersionCodeField(candidate);
+            if (version > 0) {
+                return version;
+            }
+        }
+        String[] structuredCandidates = new String[]{
+                asset.optString("name", ""),
+                release.optString("tag_name", ""),
+                release.optString("name", "")
+        };
+        for (String candidate : structuredCandidates) {
+            int version = parseStructuredVersionCode(candidate);
             if (version > 0) {
                 return version;
             }
@@ -354,13 +396,24 @@ public class UpdateHelper extends BaseRemoteHelper {
         return 0;
     }
 
-    private int parseVersionCode(String value) {
+    private int parseVersionCodeField(String value) {
         if (value == null) {
             return 0;
         }
         Matcher fieldMatcher = VERSION_CODE_FIELD.matcher(value);
         if (fieldMatcher.find()) {
             return Utilities.parseInt(fieldMatcher.group(1));
+        }
+        return 0;
+    }
+
+    private int parseStructuredVersionCode(String value) {
+        if (value == null) {
+            return 0;
+        }
+        Matcher releaseMatcher = VERSION_CODE_IN_RELEASE_NAME.matcher(value);
+        if (releaseMatcher.find()) {
+            return Utilities.parseInt(releaseMatcher.group(1));
         }
         Matcher parenthesesMatcher = VERSION_CODE_IN_PARENTHESES.matcher(value);
         int parsed = 0;

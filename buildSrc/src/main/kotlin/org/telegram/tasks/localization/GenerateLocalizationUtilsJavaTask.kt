@@ -44,6 +44,14 @@ abstract class GenerateLocalizationUtilsJavaTask : DefaultTask() {
         javaDir: File,
         languageTags: Set<String>
     ) {
+        val fallbackByLanguage = linkedMapOf<String, String>()
+        for (tag in languageTags) {
+            val language = tag.substringBefore('-')
+            if (!fallbackByLanguage.containsKey(language) || !tag.contains('-')) {
+                fallbackByLanguage[language] = tag
+            }
+        }
+
         val packageName = "org.telegram.localization"
         val packageDir = javaDir.resolve(packageName.replace('.', '/'))
 
@@ -87,14 +95,12 @@ abstract class GenerateLocalizationUtilsJavaTask : DefaultTask() {
                 java.appendLine()
                 java.appendLine("        switch (language) {")
 
-                for (tag in languageTags) {
-                    if (!tag.contains('-')) {
-                        java.append("            case \"")
-                        java.append(escapeJavaString(tag))
-                        java.append("\": return \"")
-                        java.append(getLocalizationAssetName(tag))
-                        java.appendLine("\";")
-                    }
+                for ((language, tag) in fallbackByLanguage) {
+                    java.append("            case \"")
+                    java.append(escapeJavaString(language))
+                    java.append("\": return \"")
+                    java.append(getLocalizationAssetName(tag))
+                    java.appendLine("\";")
                 }
 
                 java.appendLine("            default: return null;")

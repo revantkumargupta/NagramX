@@ -1479,6 +1479,9 @@ object NaConfig {
         if (translatorMode.Int() !in 0..2) {
             translatorMode.setConfigInt(0)
         }
+        if (autoUpdateChannel.Int() !in 0..2) {
+            autoUpdateChannel.setConfigInt(1)
+        }
         if (!getPreferences().contains(idDcType.key) && !getPreferences().getBoolean(
                 "ShowIdAndDc", true
             )

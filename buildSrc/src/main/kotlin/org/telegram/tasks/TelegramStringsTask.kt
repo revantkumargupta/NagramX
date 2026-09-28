@@ -236,7 +236,7 @@ abstract class TelegramStringsTask : DefaultTask() {
             .sorted()
             .toList()
 
-        if (stableStrings.size > 0x10000) {
+        if (stableStrings.size > 0xFFFF) {
             error(
                 "Too many stable string resources: ${stableStrings.size}. " +
                         "A single Android resource type supports at most 65536 entry IDs."
@@ -336,9 +336,28 @@ abstract class TelegramStringsTask : DefaultTask() {
                 .add(file)
         }
 
+        fun languageOf(tag: String): String = tag.substringBefore('-')
+
         for ((languageTag, files) in localizedFilesByTag) {
+            val mergedFiles = linkedSetOf<File>()
+            val language = languageOf(languageTag)
+
+            if (languageTag.contains('-')) {
+                localizedFilesByTag[language]?.let { mergedFiles.addAll(it) }
+            }
+
+            mergedFiles.addAll(files)
+
+            if (!languageTag.contains('-')) {
+                for ((regionalTag, regionalFiles) in localizedFilesByTag) {
+                    if (regionalTag != languageTag && languageOf(regionalTag) == language) {
+                        mergedFiles.addAll(regionalFiles.filter { it.name != "strings.xml" })
+                    }
+                }
+            }
+
             addLocalization(
-                files = files,
+                files = mergedFiles.toList(),
                 languageTag = languageTag
             )
         }
@@ -406,7 +425,16 @@ abstract class TelegramStringsTask : DefaultTask() {
     ): String {
         return value
             .replace("\\n", "\n")
-            .replace("\\", "")
+            .replace(Regex("\\\\u([0-9a-fA-F]{4})")) { match ->
+                match.groupValues[1].toInt(16).toChar().toString()
+            }
+            .replace("\\'", "'")
+            .replace("\\\"", "\"")
+            .replace("\\@", "@")
+            .replace("\\?", "?")
+            .replace("\\>", ">")
+            .replace("\\<", "<")
+            .replace("\\\\", "\\")
             .replace("&lt;", "<")
     }
 

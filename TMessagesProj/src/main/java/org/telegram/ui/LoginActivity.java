@@ -1589,7 +1589,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             final SlideView newView = views[page];
             currentViewNum = page;
             backButtonView.setVisibility(newView.needBackButton() || newAccount ? View.VISIBLE : View.GONE);
-            moreButtonView.setVisibility(activityMode == MODE_LOGIN && currentViewNum == VIEW_PHONE_INPUT ? View.VISIBLE : View.GONE);
+            moreButtonView.setVisibility(activityMode == MODE_LOGIN && page == VIEW_PHONE_INPUT ? View.VISIBLE : View.GONE);
 
             newView.setParams(params, false);
             setParentActivityTitle(newView.getHeaderName());
@@ -2631,7 +2631,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                     }
                     TLRPC.TL_nearestDc res = (TLRPC.TL_nearestDc) response;
                     if (codeField.length() == 0) {
-                        setCountry(languageMap, res.country.toUpperCase());
+                        setCountry(languageMap, res.country.toUpperCase(Locale.US));
                     }
                 }), ConnectionsManager.RequestFlagWithoutLogin | ConnectionsManager.RequestFlagFailOnServerErrors);
             }
@@ -2903,7 +2903,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             if (name != null && countriesArray != null) {
                 CountrySelectActivity.Country countryWithCode = null;
                 for (int i = 0; i < countriesArray.size(); i++) {
-                    if (countriesArray.get(i) != null && countriesArray.get(i).name.equals(country)) {
+                    if (countriesArray.get(i) != null && countriesArray.get(i).shortname.equalsIgnoreCase(country)) {
                         countryWithCode = countriesArray.get(i);
                         break;
                     }

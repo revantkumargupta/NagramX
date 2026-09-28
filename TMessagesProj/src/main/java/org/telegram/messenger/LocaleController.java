@@ -1401,8 +1401,12 @@ public class LocaleController {
             }
             changingConfiguration = true;
             Locale.setDefault(currentLocale);
-            android.content.res.Configuration config = new android.content.res.Configuration();
-            config.locale = currentLocale;
+            Configuration config = new Configuration(ApplicationLoader.applicationContext.getResources().getConfiguration());
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                config.setLocale(currentLocale);
+            } else {
+                config.locale = currentLocale;
+            }
             ApplicationLoader.applicationContext.getResources().updateConfiguration(config, ApplicationLoader.applicationContext.getResources().getDisplayMetrics());
             changingConfiguration = false;
             FileLog.d("applyLanguage: reloadLastFile=" + reloadLastFile + " force=" + force + " isLoadingRemote=" + isLoadingRemote);
@@ -3168,8 +3172,12 @@ public class LocaleController {
                         }
                         changingConfiguration = true;
                         Locale.setDefault(currentLocale);
-                        Configuration config = new Configuration();
-                        config.locale = currentLocale;
+                        Configuration config = new Configuration(ApplicationLoader.applicationContext.getResources().getConfiguration());
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                            config.setLocale(currentLocale);
+                        } else {
+                            config.locale = currentLocale;
+                        }
                         ApplicationLoader.applicationContext.getResources().updateConfiguration(config, ApplicationLoader.applicationContext.getResources().getDisplayMetrics());
                         changingConfiguration = false;
 

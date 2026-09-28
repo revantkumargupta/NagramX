@@ -6149,7 +6149,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                     progress.end();
                 }
             });
-        }, updateAlways);
+        }, force, updateAlways);
         if (progress != null) {
             progress.init();
         }
