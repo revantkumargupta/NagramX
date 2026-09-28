@@ -338,11 +338,6 @@ public class UpdateAppAlertDialog extends BottomSheet {
             return;
         }
         Context context = getContext();
-        if (!(context instanceof Activity)) {
-            Browser.openUrl(context, appUpdate.url);
-            dismiss();
-            return;
-        }
         Activity activity = AndroidUtilities.getActivity(context);
         if (activity == null) {
             Browser.openUrl(context, appUpdate.url);
