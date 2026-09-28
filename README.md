@@ -7,7 +7,7 @@ Nagram X is a maintained fork of Nagram based on Telegram Android. Current maint
 - [GitHub Releases](https://github.com/revantkumargupta/NagramX/releases)
 - [Telegram Channel](https://t.me/NagramX)
 
-The first maintained release is [`v12.10.5-1262`](https://github.com/revantkumargupta/NagramX/releases/tag/v12.10.5-1262), based on Telegram Android `12.10.5 (7105)`.
+The first maintained release series is based on Telegram Android `12.10.5 (7105)`.
 
 ## Verify APK
 
@@ -15,7 +15,7 @@ Current maintained APKs use this Android signing certificate:
 
 - Package name: `nu.gpu.nagram`
 - Version name: `12.10.5`
-- APK version code: `1262`
+- APK version code: `1263`
 - SHA-256: `00:11:40:4B:3D:F9:D1:A0:87:68:CD:FD:42:AE:76:73:5F:30:B2:6F:E3:2C:37:05:67:56:8C:76:BD:A7:36:87`
 
 Older archived APKs from the previous maintainer used a different signing certificate. Android will not install an update across different certificates, so users moving from an older/debug/test build may need to uninstall once before installing the current maintained release.
