@@ -38,7 +38,7 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:
-          distribution: 'temurin'
+          distribution: 'jetbrains'
           java-version: '21'
       - name: Set up Ccache
         uses: hendrikmuhs/ccache-action@v1.2.23
