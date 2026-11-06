@@ -1815,9 +1815,29 @@ public class PushListenerController {
         }
     }
 
+    // NagramX ships its own Firebase project, which Telegram's servers never push to, so FCM
+    // can't wake the app. Move installs still on the FCM default to the in-app (foreground
+    // connection) push service once; later explicit choices in settings are left alone.
+    private static void migrateToInAppPushOnce() {
+        try {
+            android.content.SharedPreferences prefs = MessagesController.getGlobalNotificationsSettings();
+            if (prefs.getBoolean("nagramx_inapp_push_migrated", false)) {
+                return;
+            }
+            prefs.edit().putBoolean("nagramx_inapp_push_migrated", true).apply();
+            int type = NaConfig.INSTANCE.getPushServiceType().Int();
+            if (type == 0 || type == 1) {
+                tw.nekomimi.nekogram.utils.AndroidUtil.setPushService(false);
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
     public static IPushListenerServiceProvider getProvider() {
         if (instance != null)
             return instance;
+        migrateToInAppPushOnce();
         switch (NaConfig.INSTANCE.getPushServiceType().Int()) {
             case 1:
             case 3: {

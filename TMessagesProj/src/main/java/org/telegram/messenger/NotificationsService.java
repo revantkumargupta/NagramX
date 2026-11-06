@@ -31,9 +31,9 @@ public class NotificationsService extends Service {
         super.onCreate();
         ApplicationLoader.postInitApplication();
         if (NaConfig.INSTANCE.getPushServiceTypeInAppDialog().Bool()) {
-            String CHANNEL_ID = "push_service_channel";
+            String CHANNEL_ID = "push_service_channel_low";
             NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, LocaleController.getString(R.string.NagramXPushService), NotificationManager.IMPORTANCE_DEFAULT);
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, LocaleController.getString(R.string.NagramXPushService), NotificationManager.IMPORTANCE_LOW);
             notificationManager.createNotificationChannel(channel);
 //            Intent explainIntent = new Intent("android.intent.action.VIEW");
 //            explainIntent.setData(Uri.parse("https://github.com/Telegram-FOSS-Team/Telegram-FOSS/blob/master/Notifications.md"));
