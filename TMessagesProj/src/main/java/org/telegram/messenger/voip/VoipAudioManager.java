@@ -82,7 +82,11 @@ public class VoipAudioManager {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             return null;
         }
-        for (AudioDeviceInfo device : getAudioManager().getAvailableCommunicationDevices()) {
+        final AudioManager manager = getAudioManager();
+        if (manager == null) {
+            return null;
+        }
+        for (AudioDeviceInfo device : manager.getAvailableCommunicationDevices()) {
             if (isBluetoothDevice(device)) {
                 return device;
             }
@@ -92,6 +96,9 @@ public class VoipAudioManager {
 
     public boolean isBluetoothOn() {
         AudioManager audioManager = getAudioManager();
+        if (audioManager == null) {
+            return false;
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             return isBluetoothDevice(audioManager.getCommunicationDevice());
         }
@@ -100,6 +107,9 @@ public class VoipAudioManager {
 
     public void startBluetooth() {
         final AudioManager audioManager = getAudioManager();
+        if (audioManager == null) {
+            return;
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             AudioDeviceInfo device = findBluetoothDevice();
             if (device == null) {
@@ -114,6 +124,9 @@ public class VoipAudioManager {
 
     public void stopBluetooth() {
         final AudioManager audioManager = getAudioManager();
+        if (audioManager == null) {
+            return;
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             Utilities.globalQueue.postRunnable(() -> {
                 if (isBluetoothDevice(audioManager.getCommunicationDevice())) {
@@ -133,13 +146,20 @@ public class VoipAudioManager {
                 stopBluetooth();
             }
         } else {
-            getAudioManager().setBluetoothScoOn(on);
+            final AudioManager audioManager = getAudioManager();
+            if (audioManager != null) {
+                audioManager.setBluetoothScoOn(on);
+            }
         }
     }
 
     public void isBluetoothAndSpeakerOnAsync(Utilities.Callback2<Boolean, Boolean> onDone) {
         Utilities.globalQueue.postRunnable(() -> {
             AudioManager audioManager = getAudioManager();
+            if (audioManager == null) {
+                AndroidUtilities.runOnUIThread(() -> onDone.run(false, false));
+                return;
+            }
             boolean isBluetoothOn = isBluetoothOn();
             boolean isSpeakerphoneOn = audioManager.isSpeakerphoneOn();
             AndroidUtilities.runOnUIThread(() -> onDone.run(isBluetoothOn, isSpeakerphoneOn));

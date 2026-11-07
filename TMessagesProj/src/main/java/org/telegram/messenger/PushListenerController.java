@@ -1828,6 +1828,14 @@ public class PushListenerController {
             int type = NaConfig.INSTANCE.getPushServiceType().Int();
             if (type == 0 || type == 1) {
                 tw.nekomimi.nekogram.utils.AndroidUtil.setPushService(false);
+                // the connections may already be up with the old setting; apply it right away
+                AndroidUtilities.runOnUIThread(() -> {
+                    for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+                        if (UserConfig.getInstance(a).isClientActivated()) {
+                            org.telegram.tgnet.ConnectionsManager.getInstance(a).setPushConnectionEnabled(true);
+                        }
+                    }
+                });
             }
         } catch (Throwable e) {
             FileLog.e(e);

@@ -4717,7 +4717,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         Bundle args = new Bundle();
                         args.putLong("chat_id", chatId);
                         args.putLong("user_id", userId);
-                        presentFragment(new QrActivity(args));
+                        presentFragment(new QrShareActivity(args));
                         return Unit.INSTANCE;
                     });
                 }
@@ -7739,7 +7739,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 Bundle args = new Bundle();
                 args.putLong("chat_id", chatId);
                 args.putLong("user_id", userId);
-                presentFragment(new QrActivity(args));
+                presentFragment(new QrShareActivity(args));
                 return Unit.INSTANCE;
             });
 

@@ -15,7 +15,7 @@ Current maintained APKs use this Android signing certificate:
 
 - Package name: `nu.gpu.nagram`
 - Version name: `13.1.1`
-- APK version code: `1275`
+- APK version code: `1276`
 - SHA-256: `00:11:40:4B:3D:F9:D1:A0:87:68:CD:FD:42:AE:76:73:5F:30:B2:6F:E3:2C:37:05:67:56:8C:76:BD:A7:36:87`
 
 Older archived APKs from the previous maintainer used a different signing certificate. Android will not install an update across different certificates, so users moving from an older/debug/test build may need to uninstall once before installing the current maintained release.
@@ -30,7 +30,7 @@ For future releases:
 - Increment the APK `versionCode` in `TMessagesProj/build.gradle` (`verCode`).
 - Keep `APP_VERSION_NAME` and `APP_VERSION_CODE` in `gradle.properties` aligned with the upstream Telegram version.
 - Create a GitHub Release with APK assets containing ABI names such as `arm64-v8a`, `x86_64`, or `universal`.
-- Include a parseable APK version code in the release title or body, for example `NagramX v13.1.1 (1275)` or `Version code: 1275`.
+- Include a parseable APK version code in the release title or body, for example `NagramX v13.1.1 (1276)` or `Version code: 1276`.
 
 ## Compilation Guide
 
