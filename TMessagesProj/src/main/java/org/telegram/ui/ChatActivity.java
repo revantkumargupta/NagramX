@@ -3888,7 +3888,8 @@ public class ChatActivity extends BaseFragment implements
             if (chatActivity != null && chatActivity.getDialogId() == UserObject.VERIFY) {
                 return true;
             }
-            return chatActivity == null || !(selectedView != null && selectedView.getMessageObject() != null && selectedView.getMessageObject().messageOwner != null);
+            // NagramX: always allow copying selected text (ignores the no-forwards restriction)
+            return true;
             /*return chatActivity == null || !(
                 chatActivity.getDialogId() < 0 && chatActivity.getMessagesController().isPeerNoForwards(chatActivity.getDialogId()) ||
                 selectedView != null && selectedView.getMessageObject() != null && (selectedView.getMessageObject().messageOwner != null && selectedView.getMessageObject().messageOwner.noforwards)
